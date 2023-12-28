@@ -5,13 +5,13 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
      name='ions',  
-     version='0.2',
+     version='0.2.1',
      py_modules = ["ions"],
      install_requires = [
                          "ase",
                          "numpy",
 			            "spglib",
-                        "netwrokx",
+                        "networkx",
                         "scipy"
                          ],
      author="Artem Dembitskiy",
