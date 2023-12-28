@@ -1,0 +1,9 @@
+include LICENSE
+include README.md
+include ions/data/*.pkl
+include ions/data/*.pickle
+include ions/data/*.json
+include ions/data/*.yaml
+include ions/data/*.txt
+include ions/data/*.csv
+include ions/data/*.cif
