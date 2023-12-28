@@ -7,6 +7,7 @@ __pycache__/
 
 # some files
 *.ipynb
+*.cif
 
 # Distribution / packaging
 bin/
