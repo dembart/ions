@@ -1,3 +1,5 @@
+![ions_logo](https://raw.githubusercontent.com/dembart/ions/main/ions_logo.png)
+
 #### About
 
 ions is a python library made for studying percolation in ionic crystals
