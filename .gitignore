@@ -8,6 +8,7 @@ __pycache__/
 # some files
 *.ipynb
 *.cif
+log
 
 # Distribution / packaging
 bin/

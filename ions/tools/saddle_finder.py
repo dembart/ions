@@ -12,7 +12,6 @@ class SaddleFinder:
     """  
     Nudged Elastic band implementation for bond valence force field.
     """
-#    def __init__(self, atoms, symbol, charge, self_interaction = True, images = None):
     def __init__(self, self_interaction = True):
 
         """  
@@ -104,11 +103,11 @@ class SaddleFinder:
         images = []
         freezed = np.array([i != source_new for i in range(len(supercell))])
         supercell.set_array('freezed', freezed)
-        #print(False in freezed)
         for p in traj:
             image = supercell.copy()
             image.positions[source_new] = p
             image = image[[i for i in range(len(image)) if i != target_new]]
+            image = image[image.numbers.argsort()]
             #image.wrap()
             images.append(image)
             assert len(image) == len(supercell) - 1
@@ -116,7 +115,7 @@ class SaddleFinder:
 
 
 
-    def bvse_neb(self, images, k = 5.0, default = True, **kwargs):
+    def bvse_neb(self, images, k = 5.0, default = True, gm = True, **kwargs):
 
         """Wrapper for ase's NEB object. Sets BVSECalculator for each image.
 
@@ -135,7 +134,9 @@ class SaddleFinder:
         
         default: boolean, whether to use default method or not, True by default
             if False, will use **kwargs passed for ase's NEB object
-        
+
+        gm: boolean, True by default
+            shift moving ion in the center image into its geometric median within supercell
         
         """
 
@@ -143,11 +144,12 @@ class SaddleFinder:
         for image in images:
             image.calc =  BVSECalculator(site = site)
 
-        center = images[len(images) // 2].copy()
-        left = images[len(images) // 2 - 1].copy()
-        right = images[len(images) // 2 + 1].copy()
-        gm, y0 = geometric_median_with_bounds(left, center, right, site)
-        images[len(images) // 2].positions[site] = np.array(gm)
+        if gm:
+            center = images[len(images) // 2].copy()
+            left = images[len(images) // 2 - 1].copy()
+            right = images[len(images) // 2 + 1].copy()
+            gm, y0 = geometric_median_with_bounds(left, center, right, site)
+            images[len(images) // 2].positions[site] = np.array(gm)
 
         if default:
             neb = NEB(

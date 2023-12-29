@@ -367,28 +367,21 @@ class PathFinder:
         """
 
         #self._annotate_edges()
-        #emaxs -= min(emins)
-        #emins -= min(emins)
-        
-        #emin = 0 # legacy naming
         emin = min(emins)
         emax = max(emaxs)
         tr = False
         unique_energies = np.unique(emaxs)
         unique_energies.sort()
         for e in unique_energies[::-1]:
-            #probe = (emin + emax) / 2
             probe = e
             mask = emaxs <= probe
             edges = percoedges[mask]
-            #print(probe)
             if len(edges) > 0:
                 try:
                     data = self._percolation_dimensionality(edges)
                     if max(list(data.values())) >= dim:
                         emin = probe
                         tr = emin
-                        #print(tr)
                     else:
                         emax = probe
                 except:
@@ -424,85 +417,7 @@ class PathFinder:
             raise
         
         return abs(tr2 - tr), tr2, tr
-    
-    
-    
-    def _neb_guess(self, edges, edge_ids, min_sep_dist = 8.0, idpp = False, step = 1.0):
 
-        """not tested"""
-
-        scale = np.ceil(min_sep_dist/ self.atoms.cell.cellpar()[:3]).astype(int)
-        P = [
-            [scale[0], 0, 0],
-            [0, scale[1], 0],
-            [0, 0, scale[2]]
-        ]
-        supercell = make_supercell(self.atoms.copy(), P)
-        out = {}
-
-        for key, edge in zip(edge_ids, edges):
-#                edge = unique_jumps[key]
-            source, target = edge[0], edge[1]
-            offset = edge[2:]
-            shift = np.where(offset < 0, 1, 0)
-#                shift = [0, 0, 0]
-            p1 = self.mobile_atoms.positions[source] + np.dot(shift, self.atoms.cell)
-            p2 = self.mobile_atoms.positions[target] + np.dot(shift + offset, self.atoms.cell)
-            scaled_edge = supercell.cell.scaled_positions([p1, p2]).round(8) # rounding for a safer wrapping
-            scaled_edge[:]%=1.0 #wrapping
-            wrapped_edge = supercell.cell.cartesian_positions(scaled_edge)
-            if np.linalg.norm(wrapped_edge[0] - wrapped_edge[1]) < 0.1:
-                print('source == target')
-                #raise
-            tree = cKDTree(supercell.positions)
-            dd, ii = tree.query(wrapped_edge)
-            if dd.max() > 1e-5:
-                print('dd_max', dd.max())
-                raise
-                
-            else:
-                source, target = ii[0], ii[1]
-                assert supercell.numbers[source] == self.specie # for the safety
-                assert supercell.numbers[target] == self.specie # 
-                base = supercell[[i for i in range(len(supercell)) if i not in [source, target]]]
-                images = []
-                steps = int(np.floor(np.linalg.norm(p1 - p2) / step))
-                if steps % 2 == 0:
-                    steps += 1
-                lin_traj = np.linspace(p1, p2, steps)
-                for p in lin_traj:
-                    image = base.copy()
-                    image.append(self.specie)
-                    image.positions[-1] = p
-                    #image.wrap()
-                    images.append(image)
-                if idpp:
-                    neb = NEB(images)
-                    neb.interpolate('idpp')
-                out.update({key: images})
-        return out
-
-
-
-
-    def write_traj(self, out, pth):
-        traj = []
-        for key in out.keys():
-            #write(pth + f'{key}.', out[key])
-            traj.extend(out[key])
-        #    write(path, )
-        write(pth, traj)
-
-
-
-
-
-    def post_processing(self, out):
-
-        """out = {'idx': e_source, e_a, e_target}"""
-
-        for key in out.keys:
-            1
 
 
 
@@ -540,6 +455,7 @@ class Perconeb(PathFinder):
     
 
 
-    def create_neb(self, images, k = 5.0, method = 'default', **kwargs):
-        images, neb = self.sf.bvse_neb(images, k = k, method = method, **kwargs)
-        return images, neb
+    def create_neb(self, images, k = 5.0, method = 'default', gm = True, **kwargs):
+        _, neb = self.sf.bvse_neb(images, k = k, method = method, **kwargs)
+        return neb
+    
