@@ -5,18 +5,18 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
      name='ions',  
-     version='0.2.1',
+     version='0.2.2',
      py_modules = ["ions"],
      install_requires = [
-                         "ase",
+                         "ase>=3.22.1",
                          "numpy",
-			            "spglib",
-                        "networkx",
-                        "scipy"
-                         ],
+			             "spglib",
+                         "networkx",
+                         "scipy"
+                        ],
      author="Artem Dembitskiy",
      author_email="art.dembitskiy@gmail.com",
-     description="A small python library for handling ionic crystals",
+     description="A python library for studying percolation in solids",
      key_words = ['ionic', 'radius', 'bond valence'],
      long_description=long_description,
      long_description_content_type="text/markdown",
