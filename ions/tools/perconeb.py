@@ -455,7 +455,30 @@ class Perconeb(PathFinder):
     
 
 
-    def create_neb(self, images, k = 5.0, method = 'default', gm = True, **kwargs):
+    def create_neb(self, images, k = 5.0, method = 'default', gm = False, **kwargs):
+        """Wrapper for ase's NEB object. Sets BVSECalculator for each image.
+
+        Parameters
+        ----------
+
+        images: list of Ase's atoms object
+            structure should contain mobile species of interest
+            and array named "freezed" defined as
+            freezed = np.array([i != source for i in range(len(supercell))])
+            atoms.sett_array('freezed', freezed)
+            see .interpolate method for the details
+
+        k: float, 5.0 by default
+            string force costant, eV
+        
+        default: boolean, whether to use default method or not, True by default
+            if False, will use **kwargs passed for ase's NEB object
+
+        gm: boolean, True by default
+            shift moving ion in the center image into its geometric median within supercell
+            was not properly tested
+        
+        """
         _, neb = self.sf.bvse_neb(images, k = k, method = method, gm = gm, **kwargs)
         return neb
     

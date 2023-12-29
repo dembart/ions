@@ -58,10 +58,10 @@ for i, images in enumerate(traj):
           f'Activation barrier {pn.sf.get_barrier(images).round(2)} eV')
 ```
 
-    Unique jump #0: Fmax 0.08 eV/angstrom | Activation barrier 3.24 eV
-    Unique jump #1: Fmax 0.05 eV/angstrom | Activation barrier 3.56 eV
-    Unique jump #2: Fmax 0.08 eV/angstrom | Activation barrier 0.35 eV
-    Unique jump #3: Fmax 0.06 eV/angstrom | Activation barrier 3.29 eV
+    Unique jump #0: Fmax 0.08 eV/angstrom | Activation barrier 3.26 eV
+    Unique jump #1: Fmax 0.06 eV/angstrom | Activation barrier 3.56 eV
+    Unique jump #2: Fmax 0.09 eV/angstrom | Activation barrier 0.35 eV
+    Unique jump #3: Fmax 0.07 eV/angstrom | Activation barrier 3.3 eV
 
 
 #### Plot profile
@@ -122,9 +122,9 @@ for i, dim_ in enumerate(dims):
     print(f'Activation barrier of {i + 1}D percolation: {round(e_a, 3)} eV')
 ```
 
-    Activation barrier of 1D percolation: 0.351 eV
-    Activation barrier of 2D percolation: 3.24 eV
-    Activation barrier of 3D percolation: 3.295 eV
+    Activation barrier of 1D percolation: 0.35 eV
+    Activation barrier of 2D percolation: 3.26 eV
+    Activation barrier of 3D percolation: 3.314 eV
 
 
 #### Available data
