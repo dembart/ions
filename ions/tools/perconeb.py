@@ -456,6 +456,6 @@ class Perconeb(PathFinder):
 
 
     def create_neb(self, images, k = 5.0, method = 'default', gm = True, **kwargs):
-        _, neb = self.sf.bvse_neb(images, k = k, method = method, **kwargs)
+        _, neb = self.sf.bvse_neb(images, k = k, method = method, gm = gm, **kwargs)
         return neb
     
