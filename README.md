@@ -1,5 +1,3 @@
-![ions_logo](https://raw.githubusercontent.com/dembart/ions/main/ions_logo.png)
-
 #### About
 
 ions is a python library made for studying percolation in ionic crystals
@@ -49,18 +47,18 @@ upper_bound = 10.0
 pn = Perconeb(atoms = atoms, specie = specie, upper_bound = upper_bound, self_interaction=True)
 
 traj = pn.percolating_jumps(tr = 0.5, min_sep_dist=10.0, spacing = 0.5)
-for images in traj:
-    images, neb = pn.create_neb(images, k = 5.0)
+for i, images in enumerate(traj):
+    neb = pn.create_neb(images, k = 5.0) # Note that images are linked to the neb object and will be changed after optimization
     optimizer = FIRE(neb, logfile = 'log')
     optimizer.run(fmax =.1, steps = 100)
-    print(f'Fmax {neb.get_forces().max().round(2)} eV/angstrom |',
+    print(f'Unique jump #{i}: Fmax {neb.get_forces().max().round(2)} eV/angstrom |',
           f'Activation barrier {pn.sf.get_barrier(images).round(2)} eV')
 ```
 
-    Fmax 0.08 eV/angstrom | Activation barrier 3.24 eV
-    Fmax 0.05 eV/angstrom | Activation barrier 3.56 eV
-    Fmax 0.08 eV/angstrom | Activation barrier 0.35 eV
-    Fmax 0.06 eV/angstrom | Activation barrier 3.29 eV
+    Unique jump #0: Fmax 0.08 eV/angstrom | Activation barrier 3.24 eV
+    Unique jump #1: Fmax 0.05 eV/angstrom | Activation barrier 3.56 eV
+    Unique jump #2: Fmax 0.08 eV/angstrom | Activation barrier 0.35 eV
+    Unique jump #3: Fmax 0.06 eV/angstrom | Activation barrier 3.29 eV
 
 
 #### Plot profile
@@ -70,18 +68,22 @@ for images in traj:
 import matplotlib.pyplot as plt
 from scipy.interpolate import pchip_interpolate
 
-profile = pn.sf.get_profile(images)
-x = np.arange(0, len(images))
-x_fit = np.linspace(0, len(images), 100)
-y_fit = pchip_interpolate(x, profile, x_fit)
+plt.rcParams.update({'font.size': 6})
 
-fig, ax = plt.subplots(dpi = 150, figsize = (3,2.5))
-ax.plot(x, profile, 'o', label = 'observed')
-ax.plot(x_fit, y_fit, zorder = 1, label = 'pchip fit')
-ax.set_ylabel('Energy, eV')
-ax.set_xlabel('Reaction coordinate')
-ax.set_xlim(x.min(), x.max())
-ax.legend(fontsize = 8, frameon = False)
+
+
+fig, axes = plt.subplots(dpi = 600, figsize = (9, 2.5), ncols = len(traj), sharey  = True)
+for ax, images in zip(axes, traj):
+    profile = pn.sf.get_profile(images)
+    x = np.arange(0, len(images))
+    x_fit = np.linspace(0, len(images), 100)
+    y_fit = pchip_interpolate(x, profile, x_fit)
+    ax.plot(x, profile, 'o', label = 'calculated')
+    ax.plot(x_fit, y_fit, zorder = 1, label = 'pchip fit', color = 'darkred')
+    ax.set_xlabel('Reaction coordinate')
+    ax.set_xlim(x.min(), x.max())
+    ax.legend(frameon = False)
+axes[0].set_ylabel('Energy, eV')
 plt.tight_layout()
 ```
 
