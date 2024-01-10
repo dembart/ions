@@ -160,7 +160,7 @@ class SaddleFinder:
                     )
         else:
             neb = NEB(images, k = k, **kwargs)
-        return images, neb
+        return neb
     
 
 

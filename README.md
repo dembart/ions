@@ -28,7 +28,57 @@ The library is under active development. Errors are expected. Most of the featur
 
 ```pip install ions```
 
-#### Percolation barriers
+#### Maximum percolation dimensionality and minimum required jump distance
+
+
+```python
+from ase.io import read, write
+from ions.tools import PathFinder
+
+file = '/Users/artemdembitskiy/Downloads/LiFePO4.cif'
+atoms = read(file)  
+
+specie = 3
+pf = PathFinder(atoms, specie, 10.0)
+
+tr = 0.5 # Minimum allowed distance between the edge and the framework
+max_dim, cutoff = pf.mincut_maxdim(tr)
+
+print(f'Maximum percolation dimensionality: {max_dim}')
+print(f'Jump distance cutoff: {cutoff} angstrom')
+```
+
+    Maximum percolation dimensionality: 3
+    Jump distance cutoff: 5.7421875 angstrom
+
+
+#### Save percolating network
+
+
+```python
+traj = pf.create_percotraj(cutoff, tr)
+write('perolating_sublattice.cif', traj) # jumps between nearest neighbors are linearly interpolated within 2x2x2 supercell
+```
+
+#### Inequivalent ionic hops forming percolating netwrok
+
+
+```python
+edges = pf.unique_edges(cutoff, tr) # list of (source, target, offset_x, offset_y, offset_z)
+edges
+```
+
+
+
+
+    array([[0, 1, 0, 0, 0],
+           [0, 3, 1, 0, 0],
+           [0, 3, 0, 0, 0],
+           [0, 0, 1, 0, 0]])
+
+
+
+#### Find saddle point for each ionic hop using bond valence force field potential
 
 
 ```python
@@ -36,32 +86,30 @@ import numpy as np
 from ase.io import read, write
 from ase.optimize import FIRE
 
-from ions.tools import Perconeb
+from ions.tools import SaddleFinder
 from ions.decorator import Decorator
 
 
+Decorator().decorate(atoms) # oxidation states are required for this method
 
-file = '/Users/artemdembitskiy/Downloads/LiFePO4.cif'
-atoms = read(file)  
-Decorator().decorate(atoms)
-
-specie = 3 # Li
-upper_bound = 10.0
-pn = Perconeb(atoms = atoms, specie = specie, upper_bound = upper_bound, self_interaction=True)
-
-traj = pn.percolating_jumps(tr = 0.5, min_sep_dist=10.0, spacing = 0.5)
-for i, images in enumerate(traj):
-    neb = pn.create_neb(images, k = 5.0) # Note that images are linked to the neb object and will be changed after optimization
+sf = SaddleFinder(self_interaction=True) # do not omit Li-Li interaction
+traj = []
+for i, edge in enumerate(edges):
+    source, target = edge[:2]
+    offset = edge[2:]
+    images = sf.interpolate(atoms, source, target, offset, min_sep_dist = 10.0, spacing = 0.5)
+    traj.append(images)
+    neb = sf.bvse_neb(images, k = 5.0) # Note that images are linked to the neb object and will be changed after optimization
     optimizer = FIRE(neb, logfile = 'log')
     optimizer.run(fmax =.1, steps = 100)
     print(f'Unique jump #{i}: Fmax {neb.get_forces().max().round(2)} eV/angstrom |',
-          f'Activation barrier {pn.sf.get_barrier(images).round(2)} eV')
+          f'Activation barrier {sf.get_barrier(images).round(2)} eV')
 ```
 
-    Unique jump #0: Fmax 0.08 eV/angstrom | Activation barrier 3.26 eV
-    Unique jump #1: Fmax 0.06 eV/angstrom | Activation barrier 3.56 eV
-    Unique jump #2: Fmax 0.09 eV/angstrom | Activation barrier 0.35 eV
-    Unique jump #3: Fmax 0.07 eV/angstrom | Activation barrier 3.3 eV
+    Unique jump #0: Fmax 0.08 eV/angstrom | Activation barrier 3.24 eV
+    Unique jump #1: Fmax 0.05 eV/angstrom | Activation barrier 3.56 eV
+    Unique jump #2: Fmax 0.08 eV/angstrom | Activation barrier 0.35 eV
+    Unique jump #3: Fmax 0.06 eV/angstrom | Activation barrier 3.29 eV
 
 
 #### Plot profile
@@ -71,13 +119,14 @@ for i, images in enumerate(traj):
 import matplotlib.pyplot as plt
 from scipy.interpolate import pchip_interpolate
 
-plt.rcParams.update({'font.size': 6})
+plt.rcParams.update({'font.size': 8})
+plt.rcParams.update({'font.family': 'Arial'})
 
 
 
 fig, axes = plt.subplots(dpi = 600, figsize = (9, 2.5), ncols = len(traj), sharey  = True)
 for ax, images in zip(axes, traj):
-    profile = pn.sf.get_profile(images)
+    profile = sf.get_profile(images)
     x = np.arange(0, len(images))
     x_fit = np.linspace(0, len(images), 100)
     y_fit = pchip_interpolate(x, profile, x_fit)
@@ -92,7 +141,7 @@ plt.tight_layout()
 
 
     
-![png](example_files/example_6_0.png)
+![png](example_files/example_12_0.png)
     
 
 
@@ -100,32 +149,87 @@ plt.tight_layout()
 
 
 ```python
-emin = []
-emax = []
+emins = []
+emaxs = []
 for images in traj:
-    emin.append(pn.sf.get_profile(images).min())
-    emax.append(pn.sf.get_profile(images).max())
+    emins.append(sf.get_profile(images).min())
+    emaxs.append(sf.get_profile(images).max())
 
-dim, cutoff = pn.mincut_maxdim(tr = 0.5)
-edges, ids, inverse = pn.unique_edges(cutoff = cutoff, dim = dim, tr = 0.5)
-mask = pn._filter_edges(tr = 0.5, cutoff = cutoff)
-percoedges = pn.u[mask][:, :2]
-
-emins = np.array(emin)[inverse]
-emaxs = np.array(emax)[inverse]
-dims = np.array([2, 4, 8])
-dims = dims[dims <= dim]
-percolation_profile = {}
-dim_edges = {}
-for i, dim_ in enumerate(dims):
-    e_a, tr_min, tr_max = pn.propagate_barriers(dim_, percoedges, emins, emaxs)
-    print(f'Activation barrier of {i + 1}D percolation: {round(e_a, 3)} eV')
+for i, dim in enumerate(np.arange(1, max_dim + 1)):
+    e_a, tr_min, tr_max = pf.propagate_barriers(cutoff, tr, emins, emaxs, dim)
+    print(f'Activation barrier of {i + 1}D percolation: {round(e_a, 2)} eV')
 ```
 
     Activation barrier of 1D percolation: 0.35 eV
-    Activation barrier of 2D percolation: 3.26 eV
-    Activation barrier of 3D percolation: 3.314 eV
+    Activation barrier of 2D percolation: 3.24 eV
+    Activation barrier of 3D percolation: 3.29 eV
 
+
+#### Put all together
+
+
+```python
+from ase.io import read, write
+from ions.tools import PathFinder, SaddleFinder
+
+file = '/Users/artemdembitskiy/Downloads/LiFePO4.cif'
+atoms = read(file)  
+Decorator().decorate(atoms) # oxidation states are required for this method
+
+specie = 3
+pf = PathFinder(atoms, specie, 10.0)
+
+tr = 0.5 # Minimum allowed distance between the edge and the framework
+max_dim, cutoff = pf.mincut_maxdim(tr)
+edges = pf.unique_edges(cutoff, tr) # list of (source, target, offset_x, offset_y, offset_z)
+
+sf = SaddleFinder(self_interaction=True) # do not omit Li-Li interaction
+traj = []
+emins = []
+emaxs = []
+for edge in edges:
+    source, target = edge[:2]
+    offset = edge[2:]
+    images = sf.interpolate(atoms, source, target, offset, min_sep_dist = 10.0, spacing = 0.5)
+    traj.append(images)
+    neb = sf.bvse_neb(images, k = 5.0, gm = True) # Note that images are linked to the neb object and will be changed after optimization
+    optimizer = FIRE(neb, logfile = 'log')
+    optimizer.run(fmax =.1, steps = 100)
+    emins.append(sf.get_profile(images).min())
+    emaxs.append(sf.get_profile(images).max())
+
+
+for dim in np.arange(1, max_dim + 1):
+    e_a, tr_min, tr_max = pf.propagate_barriers(cutoff, tr, emins, emaxs, dim)
+    print(f'Activation barrier of {dim}D percolation: {round(e_a, 2)} eV')
+
+```
+
+    Activation barrier of 1D percolation: 0.35 eV
+    Activation barrier of 2D percolation: 3.24 eV
+    Activation barrier of 3D percolation: 3.29 eV
+
+
+#### Compare with BVSE meshgrid approach (i.e. empty lattice)
+
+
+```python
+from bvlain import Lain
+
+calc = Lain(verbose = False)
+atoms = calc.read_file(file)
+_ = calc.bvse_distribution(mobile_ion = 'Li1+') # Li-Li interaction is omitted
+calc.percolation_barriers()
+```
+
+
+
+
+    {'E_1D': 0.4395, 'E_2D': 3.3301, 'E_3D': 3.3594}
+
+
+
+One may see that method implemented in bvlain library is much faster and more concise. It can be used for fast prediction of the percolation barriers, while the PathFinder and SaddleFinder can be used as a tool for interpolating local migration trajectory for futher DFT-NEB calculations.
 
 #### Available data
 

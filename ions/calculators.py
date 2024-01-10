@@ -123,7 +123,7 @@ class BVFFCalculator(Calculator):
     default_parameters = {
         'rc': 10.0,
     }
-    nolabel = True # What is?
+    nolabel = True # check
 
     def __init__(self, V, site = None, nl = None, **kwargs):
         """
