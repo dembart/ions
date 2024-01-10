@@ -60,7 +60,7 @@ traj = pf.create_percotraj(cutoff, tr)
 write('perolating_sublattice.cif', traj) # jumps between nearest neighbors are linearly interpolated within 2x2x2 supercell
 ```
 
-#### Inequivalent ionic hops forming percolating netwrok
+#### Inequivalent ionic hops forming percolating network
 
 
 ```python
@@ -229,7 +229,7 @@ calc.percolation_barriers()
 
 
 
-One may see that method implemented in bvlain library is much faster and more concise. It can be used for fast prediction of the percolation barriers, while the PathFinder and SaddleFinder can be used as a tool for interpolating local migration trajectory for futher DFT-NEB calculations.
+One may see that method implemented in bvlain library is much faster and more concise. It can be used for fast prediction of the percolation barriers, while the PathFinder and SaddleFinder can be used as a tool for interpolating local migration trajectory for further DFT-NEB calculations.
 
 #### Available data
 
