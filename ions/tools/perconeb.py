@@ -16,10 +16,7 @@ from spglib import get_symmetry_dataset
 from spglib import standardize_cell
 #from ions.tools import SaddleFinder
 
-
-
 __version__ = "0.1"
-
         
 class PathFinder:
     
@@ -103,6 +100,8 @@ class PathFinder:
             return 8
         else:
             return None
+    
+
     
     def _lineseg_dists(self, p, a, b):
         
@@ -297,10 +296,8 @@ class PathFinder:
         
         self._annotate_edges()
         dim = self._recalc_dim_for_algo(dim)
-
         emin = 0.0 # legacy naming
         emax = self.upper_bound
-        
         cutoff = -1.0
         while (emax - emin) > 0.01:
             probe = (emin + emax) / 2
@@ -321,6 +318,7 @@ class PathFinder:
         return cutoff
     
 
+
     def mincut_maxdim(self, tr):
         """finds minimum cutoff for jump distances and maximum percolation dimensionality"""
         max_dim = 0
@@ -335,7 +333,26 @@ class PathFinder:
 
 
     def unique_edges(self, cutoff, tr):
+
+        """returns inequivalent jumps [source, target, offset_x, offset_y, offset_z]
         
+        Parameters
+        ----------
+
+        cutoff: float
+            maximum distance of the jump, i.e. edge length
+
+        tr: float
+            percolation threshold for an edge, i.e. minium distance between edge (line segment)
+            between two sites in the mobile sublattice and the framework sublattie below which 
+            edge is rejected
+
+        
+        Returns
+        ----------
+        inequivalent jumps - array of [source, target, offset_x, offset_y, offset_z]
+
+        """
         mask = self._filter_edges(tr = tr, cutoff = cutoff)
         #self.accepted_mask = mask
         s = np.vstack(self.mobile_atoms.get_array('sym_label')[self.w[:, :2] - self.w[:, :2].min()][mask])
@@ -343,13 +360,14 @@ class PathFinder:
         d = self.distances[mask].round(3)
         j = self.jump_distances[mask].round(3)
         unique_pairs, idx, inverse = np.unique(np.column_stack((s, d, j)), axis = 0, return_index = True, return_inverse = True)
-        return self.w[mask][idx]#, idx, inverse
-    
+        return self.w[mask][idx], unique_pairs
+
 
 
     def create_percotraj(self, cutoff, tr, spacing = 0.5):
 
-        """creates a [2, 2, 2] supercell of the mobile sublattice and adds linearly interpolated segments for accepted jumps
+        """creates a [2, 2, 2] supercell of the mobile sublattice
+           and adds linearly interpolated segments for accepted jumps
         """
 
         mask = self._filter_edges(tr = tr, cutoff = cutoff)
@@ -453,4 +471,86 @@ class PathFinder:
         
         return abs(tr2 - tr), tr2, tr
 
-    
+
+    def interpolate(self, atoms, source, target, offset, min_sep_dist = 10.0, spacing = 0.5, n_max = 9):
+        """
+        Linearly interpolates trajectory between source and target ions. 
+        Uses min_sep_dist to create supercell. 
+
+        Parameters
+        ----------
+
+        atoms: Ase's atoms object
+            structure should contain mobile species of interest
+
+        source: int
+            index of the source positions
+
+        target: int
+            index of the target positions
+
+        offset: list of int
+            unitcell boundary crossing offset vector between source and target, e.g. [1, 0, 0]
+        
+        min_sep_dist: float, 10.0 by default
+            minimum separation distance between moving ion and its periodic replica
+        
+        spacing: float, 0.5 by default
+            length of the linear segments for the linear interpolation
+            Note: if the number of images in the iterpolated trajectory is > 9,
+                  spacing will be automatically recalculated for 9 images.
+
+        Returns
+        ----------
+        images, list of atoms objects
+            linearly interpolated trajectory
+        """
+        symbol = atoms.symbols[source]
+        scale = np.ceil(min_sep_dist/atoms.cell.cellpar()[:3]).astype(int)
+        p1 = atoms.positions[source]
+        p2 = atoms.positions[target] + np.dot(offset, atoms.cell)
+        
+        d = np.linalg.norm(p1 - p2)
+        n_images = int(d // spacing)
+        if n_images % 2 == 0:
+            n_images += 1
+        if n_images > n_max:
+            n_images = n_max
+
+        P = [
+            [scale[0], 0, 0],
+            [0, scale[1], 0],
+            [0, 0, scale[2]]
+        ]
+        supercell = make_supercell(atoms.copy(), P)
+        scaled_edge = supercell.cell.scaled_positions([p1, p2]).round(10) # rounding for a safer wrapping
+        scaled_edge[:]%=1.0 #wrapping
+        wrapped_edge = supercell.cell.cartesian_positions(scaled_edge)
+        if np.linalg.norm(wrapped_edge[0] - wrapped_edge[1]) < 0.1:
+            print('source == target', source, target)
+            print('min_sep_dist is too small for this jump', source, target, offset)
+            raise
+        tree = cKDTree(supercell.positions)
+        dd, ii = tree.query(wrapped_edge)
+        if dd.max() > 1e-6:
+            print(dd.max())
+            raise
+
+        source_new = ii[0]
+        target_new = ii[1]
+        assert supercell.symbols[source_new] == symbol
+        assert supercell.symbols[target_new] == symbol
+        assert source_new != target_new
+        traj = np.linspace(p1, p2, n_images)
+        images = []
+        freezed = np.array([i != source_new for i in range(len(supercell))])
+        supercell.set_array('freezed', freezed)
+        for p in traj:
+            image = supercell.copy()
+            image.positions[source_new] = p
+            image = image[[i for i in range(len(image)) if i != target_new]]
+            image = image[image.numbers.argsort()]
+            #image.wrap()
+            images.append(image)
+            assert len(image) == len(supercell) - 1
+        return images
