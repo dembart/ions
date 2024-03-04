@@ -129,8 +129,9 @@ class PathFinder:
             [0, 2, 0],
             [0, 0, 2]
         ]
+        #print('collecting nn')
         supercell = make_supercell(mobile_atoms.copy(), scale) 
-        supercell.pbc = False # we are interested in the percolation within the supercell
+        #supercell.pbc = False # we are interested in the percolation within the supercell -< it was a mistsake
         shifts = np.where((supercell.get_scaled_positions() * 2.0).round(4) >= 1.0, 1, 0)
         supercell.set_array('shift', shifts)
         self.mobile_supercell = supercell
@@ -171,9 +172,9 @@ class PathFinder:
             p2 = self.atoms.positions[target] + np.dot(offset + shift, self.atoms.cell)
             base = self.atoms[[i for i in range(len(self.atoms)) if i not in [source, target]]]
             translations = np.array(list(itertools.product(
-                                            [0, 1, -1], # should be [0, 1, -1, 2, -2] ideally
-                                            [0, 1, -1],
-                                            [0, 1, -1])))
+                                            [0, 1, -1, 2, -2], # should be [0, 1, -1, 2, -2] ideally
+                                            [0, 1, -1, 2, -2],
+                                            [0, 1, -1, 2, -2])))
             coords = []
             idx = []
             for tr in translations:
@@ -328,7 +329,7 @@ class PathFinder:
             if cutoff > 0.0:
                 max_dim = dim
                 dim_cutoff = cutoff
-        return max_dim, dim_cutoff
+        return  dim_cutoff, max_dim
 
 
 
@@ -355,7 +356,7 @@ class PathFinder:
         """
         mask = self._filter_edges(tr = tr, cutoff = cutoff)
         #self.accepted_mask = mask
-        s = np.vstack(self.mobile_atoms.get_array('sym_label')[self.w[:, :2] - self.w[:, :2].min()][mask])
+        s = np.vstack(self.mobile_atoms.get_array('sym_label')[self.w[:, :2] - self.w[:, :2].min()][mask]) # ?
         s.sort(axis = 1)
         d = self.distances[mask].round(3)
         j = self.jump_distances[mask].round(3)
@@ -473,6 +474,7 @@ class PathFinder:
 
 
     def interpolate(self, atoms, source, target, offset, min_sep_dist = 10.0, spacing = 0.5, n_max = 9):
+        
         """
         Linearly interpolates trajectory between source and target ions. 
         Uses min_sep_dist to create supercell. 
@@ -500,6 +502,7 @@ class PathFinder:
             Note: if the number of images in the iterpolated trajectory is > 9,
                   spacing will be automatically recalculated for 9 images.
 
+
         Returns
         ----------
         images, list of atoms objects
@@ -509,6 +512,9 @@ class PathFinder:
         scale = np.ceil(min_sep_dist/atoms.cell.cellpar()[:3]).astype(int)
         p1 = atoms.positions[source]
         p2 = atoms.positions[target] + np.dot(offset, atoms.cell)
+
+        if acb == False:
+            print(abs(offset))
         
         d = np.linalg.norm(p1 - p2)
         n_images = int(d // spacing)

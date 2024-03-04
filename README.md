@@ -42,7 +42,7 @@ specie = 3
 pf = PathFinder(atoms, specie, 10.0)
 
 tr = 0.5 # Minimum allowed distance between the edge and the framework
-max_dim, cutoff = pf.mincut_maxdim(tr)
+cutoff, max_dim = pf.mincut_maxdim(tr)
 
 print(f'Maximum percolation dimensionality: {max_dim}')
 print(f'Jump distance cutoff: {cutoff} angstrom')
@@ -50,6 +50,18 @@ print(f'Jump distance cutoff: {cutoff} angstrom')
 
     Maximum percolation dimensionality: 3
     Jump distance cutoff: 5.7421875 angstrom
+
+
+
+```python
+pf.percolation_threshold(1), pf.percolation_threshold(2), pf.percolation_threshold(3)
+```
+
+
+
+
+    (1.582, 1.4551, 0.9668)
+
 
 
 #### Save percolating network
@@ -60,21 +72,29 @@ traj = pf.create_percotraj(cutoff, tr)
 write('perolating_sublattice.cif', traj) # jumps between nearest neighbors are linearly interpolated within 2x2x2 supercell
 ```
 
-#### Inequivalent ionic hops forming percolating network
+#### Inequivalent ionic hops forming percolating netwrok
 
 
 ```python
-edges = pf.unique_edges(cutoff, tr) # list of (source, target, offset_x, offset_y, offset_z)
-edges
+edges, features = pf.unique_edges(cutoff, tr) # list of (source, target, offset_x, offset_y, offset_z)
+edges, features
 ```
 
 
 
 
-    array([[0, 1, 0, 0, 0],
-           [0, 3, 1, 0, 0],
-           [0, 3, 0, 0, 0],
-           [0, 0, 1, 0, 0]])
+    (array([[2, 3, 0, 0, 0],
+            [0, 1, 1, 0, 0],
+            [0, 3, 1, 0, 0],
+            [0, 3, 1, 1, 0],
+            [2, 1, 0, 1, 0],
+            [0, 0, 1, 0, 0]]),
+     array([[0.   , 0.   , 0.589, 5.736],
+            [0.   , 0.   , 0.66 , 5.736],
+            [0.   , 0.   , 0.695, 5.639],
+            [0.   , 0.   , 0.696, 5.639],
+            [0.   , 0.   , 1.461, 3.045],
+            [0.   , 0.   , 1.587, 4.746]]))
 
 
 
@@ -97,19 +117,21 @@ traj = []
 for i, edge in enumerate(edges):
     source, target = edge[:2]
     offset = edge[2:]
-    images = sf.interpolate(atoms, source, target, offset, min_sep_dist = 10.0, spacing = 0.5)
+    images, atoms_mod, offset = sf.interpolate(atoms, source, target, offset, min_sep_dist = 6.0, spacing = .75, abc = True)
     traj.append(images)
-    neb = sf.bvse_neb(images, k = 5.0) # Note that images are linked to the neb object and will be changed after optimization
+    neb = sf.bvse_neb(images, k = 2.0, gm = True) # Note that images are linked to the neb object and will be changed after optimization
     optimizer = FIRE(neb, logfile = 'log')
     optimizer.run(fmax =.1, steps = 100)
     print(f'Unique jump #{i}: Fmax {neb.get_forces().max().round(2)} eV/angstrom |',
-          f'Activation barrier {sf.get_barrier(images).round(2)} eV')
+         f'Activation barrier {sf.get_barrier(images).round(2)} eV')
 ```
 
-    Unique jump #0: Fmax 0.08 eV/angstrom | Activation barrier 3.24 eV
-    Unique jump #1: Fmax 0.05 eV/angstrom | Activation barrier 3.56 eV
-    Unique jump #2: Fmax 0.08 eV/angstrom | Activation barrier 0.35 eV
-    Unique jump #3: Fmax 0.06 eV/angstrom | Activation barrier 3.29 eV
+    Unique jump #0: Fmax 0.07 eV/angstrom | Activation barrier 3.15 eV
+    Unique jump #1: Fmax 1.0 eV/angstrom | Activation barrier 4.14 eV
+    Unique jump #2: Fmax 0.08 eV/angstrom | Activation barrier 3.45 eV
+    Unique jump #3: Fmax 0.42 eV/angstrom | Activation barrier 4.89 eV
+    Unique jump #4: Fmax 0.09 eV/angstrom | Activation barrier 0.38 eV
+    Unique jump #5: Fmax 0.06 eV/angstrom | Activation barrier 3.28 eV
 
 
 #### Plot profile
@@ -124,7 +146,7 @@ plt.rcParams.update({'font.family': 'Arial'})
 
 
 
-fig, axes = plt.subplots(dpi = 600, figsize = (9, 2.5), ncols = len(traj), sharey  = True)
+fig, axes = plt.subplots(dpi = 600, figsize = (12, 2.5), ncols = len(traj), sharey  = True)
 for ax, images in zip(axes, traj):
     profile = sf.get_profile(images)
     x = np.arange(0, len(images))
@@ -141,11 +163,11 @@ plt.tight_layout()
 
 
     
-![png](example_files/example_12_0.png)
+![png](example_files/example_13_0.png)
     
 
 
-#### Percolation dimensionality study
+#### Percolation dimensionality study (I found some inconsistency, don't use until update)
 
 
 ```python
@@ -160,9 +182,9 @@ for i, dim in enumerate(np.arange(1, max_dim + 1)):
     print(f'Activation barrier of {i + 1}D percolation: {round(e_a, 2)} eV')
 ```
 
-    Activation barrier of 1D percolation: 0.35 eV
-    Activation barrier of 2D percolation: 3.24 eV
-    Activation barrier of 3D percolation: 3.29 eV
+    Activation barrier of 1D percolation: 3.28 eV
+    Activation barrier of 2D percolation: 3.45 eV
+    Activation barrier of 3D percolation: 3.45 eV
 
 
 #### Put all together
@@ -180,8 +202,8 @@ specie = 3
 pf = PathFinder(atoms, specie, 10.0)
 
 tr = 0.5 # Minimum allowed distance between the edge and the framework
-max_dim, cutoff = pf.mincut_maxdim(tr)
-edges = pf.unique_edges(cutoff, tr) # list of (source, target, offset_x, offset_y, offset_z)
+cutoff, max_dim = pf.mincut_maxdim(tr)
+edges, features = pf.unique_edges(cutoff, tr) # list of (source, target, offset_x, offset_y, offset_z)
 
 sf = SaddleFinder(self_interaction=True) # do not omit Li-Li interaction
 traj = []
@@ -190,7 +212,7 @@ emaxs = []
 for edge in edges:
     source, target = edge[:2]
     offset = edge[2:]
-    images = sf.interpolate(atoms, source, target, offset, min_sep_dist = 10.0, spacing = 0.5)
+    images, atoms_mod, offset = sf.interpolate(atoms, source, target, offset, min_sep_dist = 10.0, spacing = 0.5)
     traj.append(images)
     neb = sf.bvse_neb(images, k = 5.0, gm = True) # Note that images are linked to the neb object and will be changed after optimization
     optimizer = FIRE(neb, logfile = 'log')
@@ -205,9 +227,9 @@ for dim in np.arange(1, max_dim + 1):
 
 ```
 
-    Activation barrier of 1D percolation: 0.35 eV
-    Activation barrier of 2D percolation: 3.24 eV
-    Activation barrier of 3D percolation: 3.29 eV
+    Activation barrier of 1D percolation: 3.29 eV
+    Activation barrier of 2D percolation: 3.56 eV
+    Activation barrier of 3D percolation: 3.56 eV
 
 
 #### Compare with BVSE meshgrid approach (i.e. empty lattice)
@@ -229,7 +251,7 @@ calc.percolation_barriers()
 
 
 
-One may see that method implemented in bvlain library is much faster and more concise. It can be used for fast prediction of the percolation barriers, while the PathFinder and SaddleFinder can be used as a tool for interpolating local migration trajectory for further DFT-NEB calculations.
+One may see that method implemented in bvlain library is much faster and more concise. It can be used for fast prediction of the percolation barriers, while the PathFinder and SaddleFinder can be used as a tool for interpolating local migration trajectory for futher DFT-NEB calculations.
 
 #### Available data
 

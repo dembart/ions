@@ -27,7 +27,7 @@ class SaddleFinder:
         self.self_interaction = self_interaction
 
     
-    def interpolate(self, atoms, source, target, offset, min_sep_dist = 10.0, spacing = 0.5):
+    def interpolate(self, atoms, source, target, offset, min_sep_dist = 10.0, spacing = 0.5, abc = True):
         """
         Linearly interpolates trajectory between source and target ions. 
         Uses min_sep_dist to create supercell. 
@@ -60,13 +60,23 @@ class SaddleFinder:
         images, list of atoms objects
             linearly interpolated trajectory
         """
+        scale_abc = [1, 1, 1]
+        if not abc:
+            if abs(offset).sum() > 0:
+                scale_abc = np.where(offset == 0, 1, abs(offset) * 2)
+
+
         symbol = atoms.symbols[source]
         charge = int(atoms.get_array('oxi_states')[source])
         collect_bvse_params(atoms, symbol, charge, self_interaction = self.self_interaction)
 
         scale = np.ceil(min_sep_dist/atoms.cell.cellpar()[:3]).astype(int)
-        p1 = atoms.positions[source]
-        p2 = atoms.positions[target] + np.dot(offset, atoms.cell)
+        scale = np.where(scale < scale_abc, scale_abc, scale)
+
+        shift = np.where(offset < 0, 1, 0)
+
+        p1 = atoms.positions[source]+ np.dot(shift, atoms.cell)
+        p2 = atoms.positions[target] + np.dot(offset + shift, atoms.cell)
         
         d = np.linalg.norm(p1 - p2)
         n_images = int(d // spacing)
@@ -96,6 +106,15 @@ class SaddleFinder:
 
         source_new = ii[0]
         target_new = ii[1]
+
+        atoms_mod = supercell.copy()
+        atoms_mod.symbols[source_new] = 'X'
+        atoms_mod.symbols[target_new] = 'X'
+        if not abc:
+            p1_mod = atoms_mod.positions[source_new]
+            p2_mod = atoms_mod.positions[target_new]
+            assert (d - np.linalg.norm(p1_mod - p2_mod)) < 1e-8
+
         assert supercell.symbols[source_new] == symbol
         assert supercell.symbols[target_new] == symbol
         assert source_new != target_new
@@ -111,7 +130,7 @@ class SaddleFinder:
             #image.wrap()
             images.append(image)
             assert len(image) == len(supercell) - 1
-        return images
+        return images, atoms_mod, offset
 
 
 
