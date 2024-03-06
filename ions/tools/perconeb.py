@@ -131,7 +131,7 @@ class PathFinder:
         ]
         #print('collecting nn')
         supercell = make_supercell(mobile_atoms.copy(), scale) 
-        #supercell.pbc = False # we are interested in the percolation within the supercell -< it was a mistsake
+        supercell.pbc = False # we are interested in the percolation within the supercell -< it was a mistsake-< check it twice
         shifts = np.where((supercell.get_scaled_positions() * 2.0).round(4) >= 1.0, 1, 0)
         supercell.set_array('shift', shifts)
         self.mobile_supercell = supercell
@@ -172,9 +172,9 @@ class PathFinder:
             p2 = self.atoms.positions[target] + np.dot(offset + shift, self.atoms.cell)
             base = self.atoms[[i for i in range(len(self.atoms)) if i not in [source, target]]]
             translations = np.array(list(itertools.product(
-                                            [0, 1, -1, 2, -2], # should be [0, 1, -1, 2, -2] ideally
-                                            [0, 1, -1, 2, -2],
-                                            [0, 1, -1, 2, -2])))
+                                            [0, 1, -1], # should be [0, 1, -1, 2, -2] ideally
+                                            [0, 1, -1],
+                                            [0, 1, -1])))
             coords = []
             idx = []
             for tr in translations:
