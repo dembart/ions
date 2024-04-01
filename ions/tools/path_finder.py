@@ -14,6 +14,8 @@ from ase.build import make_supercell
 from ase.data import covalent_radii
 from spglib import get_symmetry_dataset
 from spglib import standardize_cell
+
+from ions.geom import Edge
 #from ions.tools import SaddleFinder
 
 __version__ = "0.1"
@@ -361,7 +363,13 @@ class PathFinder:
         d = self.distances[mask].round(3)
         j = self.jump_distances[mask].round(3)
         unique_pairs, idx, inverse = np.unique(np.column_stack((s, d, j)), axis = 0, return_index = True, return_inverse = True)
-        return self.w[mask][idx], unique_pairs
+        edges = []
+        for e in self.w[mask][idx]:
+            edge = Edge(self.atoms, e[0], e[1], e[2:])
+            edges.append(edge)
+
+        #return self.w[mask][idx], unique_pairs
+        return edges, unique_pairs
 
 
 

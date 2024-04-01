@@ -1,2 +1,2 @@
 from .saddle_finder import SaddleFinder
-from .perconeb import PathFinder#, Perconeb
+from .path_finder import PathFinder#, Perconeb

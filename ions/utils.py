@@ -125,5 +125,5 @@ def geometric_median_with_bounds(left, center, right, source):
         return sum(((np.full(len(x),x0[0])-x)**2+(np.full(len(x),x0[1])-y)**2+(np.full(len(x),x0[2])-z)**2)**(1/2))
     
     bounds = ((x0[0] - 0.25, x0[0] + 0.25),(x0[1] - 0.25, x0[1] + 0.25), (x0[2] - 0.25, x0[2] + 0.25))
-    res = minimize(dist_func, x0, method='nelder-mead', options={'xtol': 1e-8, 'disp': False}, bounds=bounds)
+    res = minimize(dist_func, x0, method='nelder-mead', options={'disp': False}, bounds=bounds)
     return res.x, x0
