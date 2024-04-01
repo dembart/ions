@@ -205,14 +205,22 @@ class Edge:
         images = []
         freezed = np.array([i != source for i in range(len(supercell))])
         supercell.set_array('freezed', freezed)
-        base = supercell.copy()
+        #base = supercell.copy()
         traj = np.linspace(p1, p2, n_images)
         for p in traj:
-            image = base.copy()
+            image = supercell.copy()
             image.positions[source] = p
             image = image[[i for i in range(len(image)) if i != target]]
             images.append(image)
         return images
+    
+    def centroid(self, cutoff = 8.0):
+        supercell, source, target = self.unwrap(cutoff=cutoff)
+        supercell.append('X')
+        p = (supercell.positions[source] + supercell.positions[target]) / 2
+        supercell.positions[-1] = p
+        return supercell
+
     
     def __repr__(self):
         return f"Edge(source={self.source}, target={self.target}, offset={self.offset}), atoms={self.atoms}"

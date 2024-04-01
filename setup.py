@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
      name='ions',  
-     version='0.2.8',
+     version='0.2.9',
      py_modules = ["ions"],
      install_requires = [
                          "ase>=3.22.1",
