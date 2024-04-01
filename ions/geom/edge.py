@@ -219,6 +219,8 @@ class Edge:
         supercell.append('X')
         p = (supercell.positions[source] + supercell.positions[target]) / 2
         supercell.positions[-1] = p
+        freezed = np.array([i in [source, target] for i in range(len(supercell))])
+        supercell.set_array('freezed', freezed)
         return supercell
 
     
