@@ -101,6 +101,10 @@ class Edge:
             base = base[[i for i in range(len(base)) if i != wrapped_target]]
             images.append(base)
         return images
+    
+    @property
+    def centroid(self):
+        return (self.p1 +  self.p2) / 2
 
     def __repr__(self):
         #return f"Edge(source={self.source}, target={self.target}, offset={self.offset}), atoms={self.atoms}"
