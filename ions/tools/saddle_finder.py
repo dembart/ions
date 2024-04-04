@@ -26,115 +26,8 @@ class SaddleFinder:
         """
         self.self_interaction = self_interaction
 
-    
-    def interpolate(self, atoms, source, target, offset, min_sep_dist = 10.0, spacing = 0.5, abc = True):
-        """
-        Linearly interpolates trajectory between source and target ions. 
-        Uses min_sep_dist to create supercell. 
 
-        Parameters
-        ----------
-
-        atoms: Ase's atoms object
-            structure should contain mobile species of interest
-
-        source: int
-            index of the source positions
-
-        target: int
-            index of the target positions
-
-        offset: list of int
-            unitcell boundary crossing offset vector between source and target, e.g. [1, 0, 0]
-        
-        min_sep_dist: float, 10.0 by default
-            minimum separation distance between moving ion and its periodic replica
-        
-        spacing: float, 0.5 by default
-            length of the linear segments for the linear interpolation
-            Note: if the number of images in the iterpolated trajectory is > 9,
-                  spacing will be automatically recalculated for 9 images.
-
-        Returns
-        ----------
-        images, list of atoms objects
-            linearly interpolated trajectory
-        """
-        scale_abc = [1, 1, 1]
-        if not abc:
-            if abs(offset).sum() > 0:
-                scale_abc = np.where(offset == 0, 1, abs(offset) * 2)
-
-
-        symbol = atoms.symbols[source]
-        charge = int(atoms.get_array('oxi_states')[source])
-        collect_bvse_params(atoms, symbol, charge, self_interaction = self.self_interaction)
-
-        scale = np.ceil(min_sep_dist/atoms.cell.cellpar()[:3]).astype(int)
-        scale = np.where(scale < scale_abc, scale_abc, scale)
-
-        shift = np.where(offset < 0, 1, 0)
-
-        p1 = atoms.positions[source]+ np.dot(shift, atoms.cell)
-        p2 = atoms.positions[target] + np.dot(offset + shift, atoms.cell)
-        
-        d = np.linalg.norm(p1 - p2)
-        n_images = int(d // spacing)
-        if n_images % 2 == 0:
-            n_images += 1
-        if n_images > 9:
-            n_images = 9
-
-        P = [
-            [scale[0], 0, 0],
-            [0, scale[1], 0],
-            [0, 0, scale[2]]
-        ]
-        supercell = make_supercell(atoms.copy(), P)
-        scaled_edge = supercell.cell.scaled_positions([p1, p2]).round(10) # rounding for a safer wrapping
-        scaled_edge[:]%=1.0 #wrapping
-        wrapped_edge = supercell.cell.cartesian_positions(scaled_edge)
-        if np.linalg.norm(wrapped_edge[0] - wrapped_edge[1]) < 0.1:
-            print('source == target', source, target)
-            print('min_sep_dist is too small for this jump', source, target, offset)
-            raise
-        tree = cKDTree(supercell.positions)
-        dd, ii = tree.query(wrapped_edge)
-        if dd.max() > 1e-6:
-            print(dd.max())
-            raise
-
-        source_new = ii[0]
-        target_new = ii[1]
-
-        atoms_mod = supercell.copy()
-        atoms_mod.symbols[source_new] = 'X'
-        atoms_mod.symbols[target_new] = 'X'
-        if not abc:
-            p1_mod = atoms_mod.positions[source_new]
-            p2_mod = atoms_mod.positions[target_new]
-            assert (d - np.linalg.norm(p1_mod - p2_mod)) < 1e-8
-
-        assert supercell.symbols[source_new] == symbol
-        assert supercell.symbols[target_new] == symbol
-        assert source_new != target_new
-        traj = np.linspace(p1, p2, n_images)
-        images = []
-        freezed = np.array([i != source_new for i in range(len(supercell))])
-        supercell.set_array('freezed', freezed)
-        for p in traj:
-            image = supercell.copy()
-            image.positions[source_new] = p
-            image = image[[i for i in range(len(image)) if i != target_new]]
-            image = image[image.numbers.argsort()]
-            #image.wrap()
-            images.append(image)
-            assert len(image) == len(supercell) - 1
-        return images, atoms_mod, offset
-
-
-
-    def bvse_neb(self, images, k = 5.0, default = True, gm = True, **kwargs):
+    def bvse_neb(self, images, k = 2.0, default = True, gm = False, **kwargs):
 
         """Wrapper for ase's NEB object. Sets BVSECalculator for each image.
 
@@ -148,7 +41,7 @@ class SaddleFinder:
             atoms.sett_array('freezed', freezed)
             see .interpolate method for the details
 
-        k: float, 5.0 by default
+        k: float, 2.0 by default
             string force costant, eV
         
         default: boolean, whether to use default method or not, True by default

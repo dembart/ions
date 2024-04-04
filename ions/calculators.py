@@ -70,8 +70,9 @@ class BVSECalculator(Calculator):
         positions = self.atoms.positions
         cell = self.atoms.cell
         neighbors, offsets = self.nl.get_neighbors(self.site)
-        cells = np.dot(offsets, cell)
-        r = self.atoms.positions[self.site] - (atoms.positions[neighbors] + np.dot(atoms.cell.T, offsets.T).T)
+        #cells = np.dot(offsets, cell)
+        #r = self.atoms.positions[self.site] - (atoms.positions[neighbors] + np.dot(atoms.cell.T, offsets.T).T)
+        r = self.atoms.positions[self.site] - (atoms.positions[neighbors] + np.dot(offsets, atoms.cell))
         r2 = np.linalg.norm(r, axis = 1)
 
         q1 = self.atoms.get_array('oxi_states')[self.site]

@@ -127,3 +127,18 @@ def geometric_median_with_bounds(left, center, right, source):
     bounds = ((x0[0] - 0.25, x0[0] + 0.25),(x0[1] - 0.25, x0[1] + 0.25), (x0[2] - 0.25, x0[2] + 0.25))
     res = minimize(dist_func, x0, method='nelder-mead', options={'disp': False}, bounds=bounds)
     return res.x, x0
+
+def lineseg_dists(p, a, b):
+    
+    # source:    https://stackoverflow.com/questions/54442057/
+    # calculate-the-euclidian-distance-between-an-array-of-points-to-a-line-segment-in/
+    # 54442561#54442561 
+    
+    if np.all(a == b):
+        return np.linalg.norm(p - a, axis=1)
+    d = np.divide(b - a, np.linalg.norm(b - a))
+    s = np.dot(a - p, d)
+    t = np.dot(p - b, d)
+    h = np.maximum.reduce([s, t, np.zeros(len(p))])
+    c = np.cross(p - a, d)
+    return np.hypot(h, np.linalg.norm(c, axis = 1))
