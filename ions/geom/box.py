@@ -9,6 +9,7 @@ class Box:
         self.atoms = atoms.copy()
         self._set_index(self.atoms)
         self.cell = atoms.cell
+#        self.cell = self.atoms.cell.standard_form()[0]
 
 
     def _set_index(self, atoms):
@@ -16,13 +17,14 @@ class Box:
         atoms.set_array('index', index)
 
 
-    def _super_box(self, scale):
+    def _super_box(self, scale, center = False):
         scales = []
+        
         for s in scale:
-            # if -1 in self.offset:
-            #    scales.append(np.arange(-s + 1, s-1))
-            #else:
-            scales.append(np.arange(s))
+            if center:
+                scales.append(np.arange(-s + 2, s - 1))
+            else:
+                scales.append(np.arange(s))
         translations = tuple(list(itertools.product(
                                 scales[0],
                                 scales[1],

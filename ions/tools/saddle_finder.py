@@ -12,7 +12,7 @@ class SaddleFinder:
     """  
     Nudged Elastic band implementation for bond valence force field.
     """
-    def __init__(self, self_interaction = True):
+    def __init__(self):
 
         """  
         Initialization
@@ -20,11 +20,7 @@ class SaddleFinder:
         Parameters
         ----------
 
-        self_interaction: boolean, True by default
-            whether to consider interaction between mobile species
-
         """
-        self.self_interaction = self_interaction
 
 
     def bvse_neb(self, images, k = 2.0, default = True, gm = False, **kwargs):
