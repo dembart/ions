@@ -38,7 +38,7 @@ class Edge:
     def length(self):
         return np.linalg.norm(self.p1 - self.p2)
     
-    #@property
+    
     def _wrapped_target(self):
         p2_scaled = self.cell.scaled_positions(self.p2).round(10) # rounding for a safer wrapping
         p2_scaled[:]%=1.0
@@ -56,18 +56,20 @@ class Edge:
         assert self.atoms.numbers[self.target] == self.atoms.numbers[target] # not needed
         return target
 
-    #@property
     def nn(self, r_cut = None):
         if r_cut == None:
             r_cut = 2 * self.length # this is heuristics but should work well
         edge = self.superedge(r_cut, center = True)
+        #edge.atoms.wrap()
         frame_ids = np.array([i for i in range(len(edge.atoms)) if i not in [edge.source, edge.wrapped_target]])
         p = edge.atoms.positions[frame_ids]
         a = edge.atoms.positions[edge.source]
-        b = edge.atoms.positions[edge.wrapped_target]
+        b = edge.atoms.positions[edge.target] + np.dot(edge.offset, edge.cell)
         dd = lineseg_dists(p, a, b)
         nn_id = frame_ids[np.where(dd == dd.min())[0][0]]
-        return {'min_dist': dd.min(), 'nn': nn_id, 'nnp': self._project_point_on_edge(p[nn_id])}
+        image = edge.atoms.copy()
+        image.append('Pd')
+        return {'min_dist': dd.min(), 'nn': nn_id, 'nnp': edge._project_point_on_edge(p[nn_id])}
     
 
     def _project_point_on_edge(self, p):
@@ -90,6 +92,7 @@ class Edge:
             box_center = np.dot([0.5, 0.5, 0.5], supercell.cell)
             shift = box_center - centroid
             supercell.positions += shift
+        supercell.wrap()
         offset = self.offset / scale
         return Edge(supercell, self.source, self.target, offset)
     

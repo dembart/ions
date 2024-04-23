@@ -1,9 +1,12 @@
 import itertools
 import numpy as np
 from scipy.spatial.distance import cdist, euclidean
+
 from scipy.optimize import minimize
 from ase.data import atomic_numbers, covalent_radii
 from ions.data import bvse_data, principle_number
+
+
 
 def collect_bvse_params(atoms, symbol, charge, self_interaction = True):
     
@@ -142,3 +145,12 @@ def lineseg_dists(p, a, b):
     h = np.maximum.reduce([s, t, np.zeros(len(p))])
     c = np.cross(p - a, d)
     return np.hypot(h, np.linalg.norm(c, axis = 1))
+
+
+def project_point_on_edge(p, p1, p2):
+    ap = p-p1
+    ab = p2 - p1
+    result = p1 + np.dot(ap,ab)/np.dot(ab,ab) * ab
+    return result
+
+
