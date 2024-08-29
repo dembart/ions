@@ -30,17 +30,23 @@ class Edge:
         self.target = target
         self.offset = np.array(offset)
         self.cell = self.atoms.cell
-        self.p1 = self.atoms.positions[self.source]
-        self.p2 = np.dot(self.offset, self.cell) + self.atoms.positions[self.target]
+        #self.p1 = self.atoms.positions[self.source]
+        #self.p2 = self.atoms.positions[self.target] + np.dot(self.offset, self.cell)
         self.wrapped_target = self._wrapped_target()
+        self.info = {}
 
     @property
     def length(self):
-        return np.linalg.norm(self.p1 - self.p2)
+        p1 = self.atoms.positions[self.source]
+        p2 = self.atoms.positions[self.target] + np.dot(self.offset, self.cell)
+        return np.linalg.norm(p1 - p2)
     
     
     def _wrapped_target(self):
-        p2_scaled = self.cell.scaled_positions(self.p2).round(10) # rounding for a safer wrapping
+    
+        p1 = self.atoms.positions[self.source]
+        p2 = self.atoms.positions[self.target] + np.dot(self.offset, self.cell)
+        p2_scaled = self.cell.scaled_positions(p2).round(10) # rounding for a safer wrapping
         p2_scaled[:]%=1.0
         p2_wrapped = self.cell.cartesian_positions(p2_scaled)
         target_specie = self.atoms.numbers[self.target]
@@ -59,7 +65,7 @@ class Edge:
     def nn(self, r_cut = None):
         if r_cut == None:
             r_cut = 2 * self.length # this is heuristics but should work well
-        edge = self.superedge(r_cut, center = True)
+        edge = self.superedge(r_cut)
         #edge.atoms.wrap()
         frame_ids = np.array([i for i in range(len(edge.atoms)) if i not in [edge.source, edge.wrapped_target]])
         p = edge.atoms.positions[frame_ids]
@@ -73,25 +79,35 @@ class Edge:
     
 
     def _project_point_on_edge(self, p):
-        ap = p-self.p1
-        ab = self.p2 - self.p1
-        result = self.p1 + np.dot(ap,ab)/np.dot(ab,ab) * ab
+
+        p1 = self.atoms.positions[self.source]
+        p2 = self.atoms.positions[self.target] + np.dot(self.offset, self.cell)
+        ap = p-p1
+        ab = p2 - p1
+        result = p1 + np.dot(ap,ab)/np.dot(ab,ab) * ab
         return result
     
 
-    def superedge(self, r_cut, center = True):
-        scale = np.ceil(r_cut/abs(np.diag(self.cell)))
-        box = Box(self.atoms)
+
+    def superedge(self, r_cut):
+        #scale = np.ceil(r_cut/abs(np.diag(self.cell))) # wrong approach
+        scale_a = np.ceil(r_cut/(self.cell.volume/np.linalg.norm(np.cross(self.cell[2, :], self.cell[1, :]))))
+        scale_b = np.ceil(r_cut/(self.cell.volume/np.linalg.norm(np.cross(self.cell[0, :], self.cell[2, :]))))
+        scale_c = np.ceil(r_cut/(self.cell.volume/np.linalg.norm(np.cross(self.cell[0, :], self.cell[1, :]))))
+        scale = np.array([scale_a, scale_b, scale_c])
+        #print(scale, np.ceil(r_cut/abs(np.diag(self.cell))))
+        #print(scale, np.diag(self.cell))
+        box = Box(self.atoms.copy())
         supercell = box._super_box(scale)
-        if center:
-            p1 = supercell.positions[self.source]
-            p2 = supercell.positions[self.target] + np.dot(self.offset, self.cell)
-            d = np.linalg.norm(p1 - p2)
-            assert abs(d - self.length) < 1e-10
-            centroid = (p1 + p2) / 2
-            box_center = np.dot([0.5, 0.5, 0.5], supercell.cell)
-            shift = box_center - centroid
-            supercell.positions += shift
+        # if center: # causes very bad results, kept for test of the wrong predictions
+        #     p1 = supercell.positions[self.source]
+        #     p2 = supercell.positions[self.target] + np.dot(self.offset, self.cell)
+        #     d = np.linalg.norm(p1 - p2)
+        #     assert abs(d - self.length) < 1e-10
+        #     centroid = (p1 + p2) / 2
+        #     box_center = np.dot([0.5, 0.5, 0.5], supercell.cell)
+        #     shift = box_center - centroid
+        #     supercell.positions += shift
         supercell.wrap()
         offset = self.offset / scale
         return Edge(supercell, self.source, self.target, offset)
@@ -99,13 +115,17 @@ class Edge:
 
     @property
     def centroid(self):
-        return (self.p1 +  self.p2) / 2
+        p1 = self.atoms.positions[self.source]
+        p2 = self.atoms.positions[self.target] + np.dot(self.offset, self.cell)
+        return (p1 + p2) / 2
     
-    def interpolate(self, spacing = 0.75, n_images = None, n_max = 11, n_min = 5, sort_atoms = True):
+    def interpolate(self, spacing = 0.75, n_images = None, n_max = 11, n_min = 5, sort_atoms = True, center = True):
         # interpolate between self.p1 and self.p2
         if not n_images:
             n_images = max(n_min, min(int(np.ceil(self.length/spacing) + (1 + np.ceil(self.length/spacing))%2), n_max))
-        traj = np.linspace(self.p1, self.p2, n_images)
+        p1 = self.atoms.positions[self.source]
+        p2 = self.atoms.positions[self.target] + np.dot(self.offset, self.cell)
+        traj = np.linspace(p1, p2, n_images)
         images = []
         wrapped_target = self.wrapped_target
         source_mask = np.array([i != self.source for i in range(len(self.atoms))])
@@ -122,7 +142,12 @@ class Edge:
                 base = sort(base, base.get_array('freezed'))
 
             images.append(base)
-        
+
+        if center:
+            shift = np.dot([0.5, 0.5, 0.5], self.cell) - (p1 + p2) / 2
+            for image in images:
+                image.positions += shift
+                image.wrap()
         # check for errors
         source = np.argwhere(images[0].get_array('freezed') == False).ravel()[0]
         for i in range(1, n_images):
@@ -132,11 +157,9 @@ class Edge:
         return images
     
 
-
-
     def __repr__(self):
         #return f"Edge(source={self.source}, target={self.target}, offset={self.offset}), atoms={self.atoms}"
-        return f"Edge({self.source},{self.target},{self.offset}, d={round(self.length, 2)}, wrapped_target={self.wrapped_target}')"
+        return f"Edge({self.source},{self.target},{self.offset}, d={round(self.length, 2)}, wrapped_target={self.wrapped_target}, info = {self.info}')"
 
 
     

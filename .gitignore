@@ -9,7 +9,18 @@ __pycache__/
 *.ipynb
 *.cif
 *.xyz
+*.sh
+dft_results.csv
+*.traj
+*.xyz
+POSCAR
 log
+setup_.py
+test_edge_ids_small.csv
+bvse_vs_ft.png
+*.neb
+example.md
+
 
 # Distribution / packaging
 bin/

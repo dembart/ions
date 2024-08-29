@@ -1,1 +1,1 @@
-#from .edge_featurizer import EdgeFeaturizer
+from ._edge_featurizer import EdgeFeaturizer

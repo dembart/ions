@@ -339,12 +339,12 @@ class Percolator:
         s.sort(axis = 1)
         d = self.distances[mask].round(3)
         j = self.jump_distances[mask].round(3)
-        unique_pairs, idx, inverse = np.unique(np.column_stack((s, d, j)), axis = 0, return_index = True, return_inverse = True)
+        unique_pairs, idx, inverse, counts = np.unique(np.column_stack((s, d, j)), axis = 0, return_index = True, return_inverse = True, return_counts = True)
         edges = []
-        for e in self.w[mask][idx]:
+        for e, c, index in zip(self.w[mask][idx], counts, idx):
             edge = Edge(self.atoms, e[0], e[1], e[2:])
+            edge.info.update({'multiplicity': c, 'index': index})
             edges.append(edge)
-
         #return self.w[mask][idx], unique_pairs
         return edges, unique_pairs
     

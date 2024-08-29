@@ -1,12 +1,11 @@
 import itertools
 import numpy as np
 from scipy.spatial.distance import cdist, euclidean
-
 from scipy.optimize import minimize
 from ase.data import atomic_numbers, covalent_radii
 from ions.data import bvse_data, principle_number
 
-
+__version__ = 0.4
 
 def collect_bvse_params(atoms, symbol, charge, self_interaction = True):
     
@@ -77,7 +76,6 @@ def geometric_median(X, y0, eps=1e-5, max_iter = 200):
         if euclidean(y, y1) < eps:
             return y1
         
-        
         if counter > max_iter:
             return y
         y = y1
@@ -125,7 +123,7 @@ def geometric_median_with_bounds(left, center, right, source):
     z = X[:, 2]
     x0 = center.copy().positions[source]
     def dist_func(x0):
-        return sum(((np.full(len(x),x0[0])-x)**2+(np.full(len(x),x0[1])-y)**2+(np.full(len(x),x0[2])-z)**2)**(1/2))
+        return 1 / sum(((np.full(len(x),x0[0])-x)**2+(np.full(len(x),x0[1])-y)**2+(np.full(len(x),x0[2])-z)**2)**(1/2))
     
     bounds = ((x0[0] - 0.25, x0[0] + 0.25),(x0[1] - 0.25, x0[1] + 0.25), (x0[2] - 0.25, x0[2] + 0.25))
     res = minimize(dist_func, x0, method='nelder-mead', options={'disp': False}, bounds=bounds)

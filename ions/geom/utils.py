@@ -5,6 +5,39 @@ from ase.neighborlist import NeighborList
 
 """some geometry utils copied from pymatgen"""
 
+
+def are_collinear(vs, tol=0.01):
+
+    """source: https://github.com/mcs-cice/IonExplorer2/blob/main/geometry.py"""
+
+    if len(vs) < 2:
+        return True
+    v_0 = vs[0]
+    for v in vs[1:]:
+        if sum(abs(np.cross(v_0, v))) > tol:
+            return False
+    return True
+
+
+def are_coplanar(vs, tol=0.01):
+    """soure: https://github.com/mcs-cice/IonExplorer2/blob/main/geometry.py"""
+
+    if len(vs) < 3:
+        return True
+    v_1 = vs[0]
+    for v in vs[1:]:
+        if not are_collinear([v_1, v]):
+            ab = np.cross(v_1, v)
+            break
+    else:
+        return True
+    for v in vs[1:]:
+        if abs(np.dot(ab, v)) > tol:
+            return False
+    return True
+
+
+
 def _vol_tetra(vt1, vt2, vt3, vt4):
     """
     Copied from pymatgen's repo

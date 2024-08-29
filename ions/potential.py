@@ -114,6 +114,21 @@ class BVFF:
         return dfdx/2
 
 
+    def Morse_pairwise_force(alpha, d0, r_min, rij):
+        f_ij = alpha * d0 * (np.exp (alpha * (r_min - rij)) - 1) * np.exp (alpha * (r_min - rij))
+        return f_ij
+
+
+    def Coulomb_pairwise_force(q1, q2, rij, f, rc1, rc2, n1, n2):
+        k = 14.4
+        term1 = k * q1 * q2 * erfc(rij / (f * (rc1 + rc2))) / ((rij ** 2) * np.sqrt(n1 * n2)) 
+        term2 = 2 * k * q1 * q2 * np.exp (-(rij/(f * (rc1 + rc2)))**2) / (np.sqrt(np.pi)*f*(rc1 + rc2)*rij*np.sqrt(n1*n2))
+        f_ij = term1 + term2
+        return f_ij
+
+
+
+
     def dCoulomb_dX(x, q1, q2, rc1, rc2, n1, n2, r, f = 0.74):
 
         """ Calculate partial derivative of Coulomb-type pair potential.
