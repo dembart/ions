@@ -1,9 +1,16 @@
 import numpy as np 
 from scipy.spatial import Voronoi
-from .box import Box
 from ase.neighborlist import NeighborList
+from .box import Box
+
+
 
 """some geometry utils copied from pymatgen"""
+
+
+def _effective_CN(areas):
+    CN = (areas.sum()**2) / ((areas**2).sum())
+    return CN
 
 
 def are_collinear(vs, tol=0.01):
@@ -35,6 +42,28 @@ def are_coplanar(vs, tol=0.01):
         if abs(np.dot(ab, v)) > tol:
             return False
     return True
+
+def _find_vneighbors(points, central_points_ids, key=1, min_dist=-float("inf"), max_dist=float("inf")):
+    """soure: https://github.com/mcs-cice/IonExplorer2/blob/main/geometry.py
+     Parameter mod can takes values 1, 2, or 3 that correspond to the
+    search for domains adjacent by vertices, edges or faces.
+    """
+
+    neighbors = {i: None for i in central_points_ids}
+    vor = Voronoi(points)
+    for i in central_points_ids:
+        cp = points[i]
+        region = vor.regions[vor.point_region[i]]
+        if -1 in region:
+            raise ValueError("The domain for \"" + str(i) + "\" point is not closed!")
+        local_neighbors = []
+        for j in range(len(points)):
+            numb_common_vertices = len(np.intersect1d(region, vor.regions[vor.point_region[j]]))
+            if i != j and numb_common_vertices >= key and min_dist < np.linalg.norm(cp - points[j]) < max_dist:
+                local_neighbors.append(j)
+        neighbors[i] =  local_neighbors
+    return neighbors
+
 
 
 

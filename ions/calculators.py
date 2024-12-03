@@ -472,7 +472,7 @@ class BVSECalculator_old2(Calculator):
 
 class GMCalculator(Calculator):
     """
-    Test  calcualtor
+    Test calcualtor
     """
 
     implemented_properties = ["energy", "forces", "min_distance"]

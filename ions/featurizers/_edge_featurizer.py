@@ -137,11 +137,7 @@ class EdgeFeaturizer(Edge):
         CN = (areas.sum()**2) / ((areas**2).sum())
         return CN
     
-    def _is_element_in_structure(self, possible_elements = ['O', 'F', 'P', 'S', 'B', 'I', 'F', 'Cl', 'N']):
-        data = {}
-        for element in possible_elements:
-            data.update({f'has_{element}': int(element in self.atoms.symbols)})
-        return data
+
     
 
     def _calc_stat(self, arr, stat):
@@ -241,6 +237,7 @@ class EdgeFeaturizer(Edge):
             data.update({f'has_{element}': int(element in self.atoms.symbols)})
         return data
 
+    
 
     def featurize(self, stats = ['min', 'max', 'mean', 'range']):
 
