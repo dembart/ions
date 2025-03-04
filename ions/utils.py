@@ -5,7 +5,7 @@ from scipy.optimize import minimize
 from ase.data import atomic_numbers, covalent_radii
 from ions.data import bvse_data, principle_number
 
-__version__ = 0.4
+__version__ = "0.4.1"
 
 def collect_bvse_params(atoms, symbol, charge, self_interaction = True):
     
