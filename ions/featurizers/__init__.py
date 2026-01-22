@@ -1,2 +1,2 @@
-from ._edge_featurizer import EdgeFeaturizer
-from ._structure_featurizer import StructureFeaturizer
+from .edge_featurizer import EdgeFeaturizer
+from .structure_featurizer import StructureFeaturizer

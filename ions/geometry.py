@@ -1,47 +1,62 @@
 import numpy as np 
 from scipy.spatial import Voronoi
+from scipy.spatial.distance import cdist, euclidean
 from ase.neighborlist import NeighborList
-from .box import Box
 
+
+
+def repeated_supercell(atoms, scale, center = False, tol=1e-10):
+
+    atoms = atoms.copy()
+    atoms.set_array('index', np.arange(len(atoms)))
+    supercell = atoms.repeat([int(s) for s in scale])
+
+    if center:
+        shift = np.dot([0.5, 0.5, 0.5], supercell.cell)
+        supercell.translate(shift)
+
+    frac = np.linalg.solve(atoms.cell.T, supercell.positions.T).T
+
+    # Separate integer and fractional parts
+    offsets = np.floor(frac + tol).astype(int)
+    # intra_frac = frac - offsets # for debug
+    supercell.set_array('offset', offsets)
+    return supercell
+
+
+
+def lineseg_dists(p, a, b):
+    
+    """Distance from p to the linear sigment (a, b)"""
+    # source:    https://stackoverflow.com/questions/54442057/
+    # calculate-the-euclidian-distance-between-an-array-of-points-to-a-line-segment-in/
+    # 54442561#54442561 
+    
+    if np.all(a == b):
+        return np.linalg.norm(p - a, axis=1)
+    d = np.divide(b - a, np.linalg.norm(b - a))
+    s = np.dot(a - p, d)
+    t = np.dot(p - b, d)
+    h = np.maximum.reduce([s, t, np.zeros(len(p))])
+    c = np.cross(p - a, d)
+    return np.hypot(h, np.linalg.norm(c, axis = 1))
+
+
+
+def project_point_on_edge(p, p1, p2):
+    """Orthogonal projection of point p onto the linear segment (p1,p2)"""
+    ap = p-p1
+    ab = p2 - p1
+    result = p1 + np.dot(ap,ab)/np.dot(ab,ab) * ab
+    return result
 
 
 """some geometry utils copied from pymatgen"""
-
 
 def _effective_CN(areas):
     CN = (areas.sum()**2) / ((areas**2).sum())
     return CN
 
-
-def are_collinear(vs, tol=0.01):
-
-    """source: https://github.com/mcs-cice/IonExplorer2/blob/main/geometry.py"""
-
-    if len(vs) < 2:
-        return True
-    v_0 = vs[0]
-    for v in vs[1:]:
-        if sum(abs(np.cross(v_0, v))) > tol:
-            return False
-    return True
-
-
-def are_coplanar(vs, tol=0.01):
-    """soure: https://github.com/mcs-cice/IonExplorer2/blob/main/geometry.py"""
-
-    if len(vs) < 3:
-        return True
-    v_1 = vs[0]
-    for v in vs[1:]:
-        if not are_collinear([v_1, v]):
-            ab = np.cross(v_1, v)
-            break
-    else:
-        return True
-    for v in vs[1:]:
-        if abs(np.dot(ab, v)) > tol:
-            return False
-    return True
 
 def _find_vneighbors(points, central_points_ids, key=1, min_dist=-float("inf"), max_dist=float("inf")):
     """soure: https://github.com/mcs-cice/IonExplorer2/blob/main/geometry.py
@@ -66,7 +81,6 @@ def _find_vneighbors(points, central_points_ids, key=1, min_dist=-float("inf"), 
 
 
 
-
 def _vol_tetra(vt1, vt2, vt3, vt4):
     """
     Copied from pymatgen's repo
@@ -81,10 +95,11 @@ def _vol_tetra(vt1, vt2, vt3, vt4):
 
     Returns:
         (float): volume of the tetrahedron.
+
     """
-    vol_tetra = np.abs(np.dot((vt1 - vt4), np.cross((vt2 - vt4), (vt3 - vt4)))) / 6
-    
+    vol_tetra = np.abs(np.dot((vt1 - vt4), np.cross((vt2 - vt4), (vt3 - vt4)))) / 6    
     return vol_tetra
+
 
 
 def _solid_angle(center, coords):
@@ -119,8 +134,45 @@ def _solid_angle(center, coords):
         )
         my_angle = (0.5 * np.pi if tp > 0 else -0.5 * np.pi) if de == 0 else np.arctan(tp / de)
         angle += (my_angle if my_angle > 0 else my_angle + np.pi) * 2
-
     return angle
+
+
+
+def _geometric_median(X, y0, eps=1e-5, max_iter = 200):
+    """
+    Finds geometric median of the X points using y0 as the initial guess
+    """
+    #y = np.mean(X, 0)
+    y = y0
+    counter = 0
+    while True:
+        counter += 1
+        D = cdist(X, [y])
+        nonzeros = (D != 0)[:, 0]
+
+        Dinv = 1 / D[nonzeros]
+        Dinvs = np.sum(Dinv)
+        W = Dinv / Dinvs
+        T = np.sum(W * X[nonzeros], 0)
+
+        num_zeros = len(X) - np.sum(nonzeros)
+        if num_zeros == 0:
+            y1 = T
+        elif num_zeros == len(X):
+            return y
+        else:
+            R = (T - y) * Dinvs
+            r = np.linalg.norm(R)
+            rinv = 0 if r == 0 else num_zeros/r
+            y1 = max(0, 1-rinv)*T + min(1, rinv)*y
+
+        if euclidean(y, y1) < eps:
+            return y1
+        
+        if counter > max_iter:
+            return y
+        y = y1
+
 
 
 class VoroSite:
@@ -139,7 +191,8 @@ class VoroSite:
     
     def _vneighbors(self, site_id):
         scale = np.ceil(self.r_cut/abs(np.diag(self.cell)))
-        supercell = Box(self.atoms.copy())._super_box(scale)
+        #supercell = Box(self.atoms.copy())._super_box(scale)
+        supercell = repeated_supercell(self.atoms, scale)
         shift = np.dot([0.5, 0.5, 0.5], supercell.cell) - supercell.positions[site_id]
         supercell.positions += shift
         supercell.wrap()
@@ -212,4 +265,6 @@ class VoroSite:
 
         for key in data.keys():
             data[key] = np.array(data[key])
-        return data, supercell
+        return data, supercell    
+
+

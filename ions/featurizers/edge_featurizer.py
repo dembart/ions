@@ -1,16 +1,16 @@
 import itertools
 import numpy as np
-from ions.utils import lineseg_dists, project_point_on_edge
+from scipy.spatial import cKDTree
+
 from ase.data import covalent_radii
-#from ions.utils import collect_bvse_params
-from ions.tools import SaddleFinder
-from ions.geom import Box, Edge
-from ions.geom.utils import VoroSite, _solid_angle, _vol_tetra
-from ions.utils import geometric_median
-from ions.data import ionic_radii, elneg_pauling
-from scipy.spatial import Voronoi, cKDTree
 from pymatgen.io.ase import AseAtomsAdaptor
 from pymatgen.analysis.local_env import VoronoiNN
+
+from ..edge import Edge 
+from ..geometry import VoroSite, _geometric_median, lineseg_dists, project_point_on_edge
+from ..data import ionic_radii, elneg_pauling
+
+
 
 
 class EdgeFeaturizer(Edge):
@@ -77,8 +77,6 @@ class EdgeFeaturizer(Edge):
         self.oxi = oxi
         if self.oxi:
             self._set_ionic_radii()
-        self.p1 = self.atoms.positions[self.source]
-        self.p2 = self.atoms.positions[self.target] + np.dot(self.offset, self.cell)
         # if self.bvse:
         #     collect_bvse_params(self.atoms, self.atoms.symbols[self.target], self.atoms.arrays['oxi_states'][self.source])
 
@@ -139,7 +137,6 @@ class EdgeFeaturizer(Edge):
     
 
     
-
     def _calc_stat(self, arr, stat):
 
         if stat == 'min':
@@ -155,6 +152,7 @@ class EdgeFeaturizer(Edge):
     
     def _cylinder_volume_of_max_percolation_radius(self, min_dist):
         return np.pi * (min_dist**2) * self.length
+
 
     
     def _get_voro_data(self, atoms, site_id):
@@ -225,7 +223,7 @@ class EdgeFeaturizer(Edge):
         p = np.vstack(coords)
         tree = cKDTree(p)
         dd, ii = tree.query(pos, distance_upper_bound=10.0, k = CN) 
-        gm = geometric_median(p[ii], pos) # the initial guess is from nnp
+        gm = _geometric_median(p[ii], pos) # the initial guess is from nnp
         atoms.positions[site_id] = gm
         data_gm = self._get_voro_data(atoms, site_id)
         return data_source, data_target, data_nnp, data_gm

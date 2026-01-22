@@ -1,18 +1,38 @@
 import numpy as np
 from scipy.spatial import Voronoi
-from ase.data import covalent_radii
-from ase.spacegroup import get_spacegroup
 from spglib import get_symmetry_dataset
+from ase.data import covalent_radii, chemical_symbols
+from ase.spacegroup import get_spacegroup
 
-from ions.tools import Percolator
-from ions.geom import Box
-from ions.geom.utils import _solid_angle, _vol_tetra, _effective_CN, _find_vneighbors
-from ions.data import ionic_radii, elneg_pauling
+from ..percolator import Percolator
+from ..geometry import _solid_angle, _vol_tetra, _effective_CN, _find_vneighbors, repeated_supercell
+from ..data import ionic_radii, elneg_pauling
 
 
 class StructureFeaturizer:
 
     def __init__(self, atoms, specie, r_cut = 10.0, oxi = False, symprec = 0.1):
+        
+        """ 
+        Parameters
+        ----------
+
+        atoms: ase's Atoms object
+            Atomic structure. Should contain a mobile specie of interest.
+
+        specie: int
+            Atomic number of a mobile specie, e.g. 3 for Li
+
+        r_cut: float, 10.0 by default
+            cutoff for collecting neighbors
+            
+        oxi: boolean, False by default
+            collect features associated with ions
+
+        symprec: float, 0.1 by default
+            precision for a space group analysis
+
+        """
 
         self._set_symmetry_labels(atoms, symprec)
         self.specie = specie
@@ -48,13 +68,21 @@ class StructureFeaturizer:
             
 
     def _create_supercell(self, atoms):
-        scale_a = np.ceil(self.r_cut/(self.cell.volume/np.linalg.norm(np.cross(self.cell[2, :], self.cell[1, :]))))
-        scale_b = np.ceil(self.r_cut/(self.cell.volume/np.linalg.norm(np.cross(self.cell[0, :], self.cell[2, :]))))
-        scale_c = np.ceil(self.r_cut/(self.cell.volume/np.linalg.norm(np.cross(self.cell[0, :], self.cell[1, :]))))
+
+        cell = atoms.cell
+        scale_a = np.ceil(self.r_cut/(atoms.cell.volume/np.linalg.norm(np.cross(cell[2, :], cell[1, :]))))
+        scale_b = np.ceil(self.r_cut/(atoms.cell.volume/np.linalg.norm(np.cross(cell[0, :], cell[2, :]))))
+        scale_c = np.ceil(self.r_cut/(atoms.cell.volume/np.linalg.norm(np.cross(cell[0, :], cell[1, :]))))
         scale = np.array([scale_a, scale_b, scale_c])
         scale = np.where(scale < 3, 3, scale)        
         #mobile_atoms = self.atoms[self.atoms.numbers == self.specie]
-        supercell = Box(atoms)._super_box(scale, center = True)
+        #supercell = Box(atoms)._super_box(scale, center = True)
+        supercell = repeated_supercell(atoms, scale)
+        
+        # this update was not tested
+        shift = 0.5 * np.dot(np.array(scale) - 1, cell)
+        supercell.translate(shift)
+        supercell.wrap()
         return supercell
 
 
@@ -150,7 +178,7 @@ class StructureFeaturizer:
 
     def _percolation_radii(self):
         
-        pl = Percolator(self.atoms, self.specie, self.r_cut)
+        pl = Percolator(self.atoms, mobile_specie=chemical_symbols[self.specie], upper_bound=self.r_cut)
         self.pl = pl
         radii = {
             'r1d': pl.percolation_threshold(1), 
@@ -249,10 +277,10 @@ class StructureFeaturizer:
     def _mobile_ion_hops_centroids(self):
         mobile_atoms = self.atoms[self.atoms.numbers == self.specie]
         supercell = self._create_supercell(mobile_atoms)
-        central_points_ids = np.arange(len(mobile_atoms) * supercell.info['translation_id'][(0,0,0)],
-                                      (len(mobile_atoms) * (supercell.info['translation_id'][(0,0,0)] + 1)))
+        #central_points_ids = np.arange(len(mobile_atoms) * supercell.info['translation_id'][(0,0,0)],
+                                      #(len(mobile_atoms) * (supercell.info['translation_id'][(0,0,0)] + 1)))
+        central_points_ids = np.arange(len(mobile_atoms))
     
-
         nn = _find_vneighbors(supercell.positions, central_points_ids)
         edges = []
         for source in nn.keys():
@@ -270,6 +298,20 @@ class StructureFeaturizer:
     
     def featurize(self, stats = ['mean', 'min']):
 
+        """ 
+        Parameters
+        ----------
+
+        stats: list of str, ['mean', 'min']
+            list of statistics to be calculated for each feature
+            allowed statistics are 'mean', 'min', 'max', 'range', 'std'
+
+        Returns
+        -------
+        dict with feature labels and values
+        """
+
+
         features = {}
         features.update(self._percolation_radii())
         features.update(self._covalent_free_space())
@@ -285,8 +327,9 @@ class StructureFeaturizer:
         label = 'mobile_ions_framework'
         atoms = self.atoms.copy()
         supercell = self._create_supercell(atoms)
-        central_points_ids = np.arange(len(atoms) * supercell.info['translation_id'][(0,0,0)],
-                                      (len(atoms) * (supercell.info['translation_id'][(0,0,0)] + 1))) 
+        #central_points_ids = np.arange(len(atoms) * supercell.info['translation_id'][(0,0,0)],
+        #                              (len(atoms) * (supercell.info['translation_id'][(0,0,0)] + 1))) 
+        central_points_ids = np.arange(len(atoms))
         central_points_ids = central_points_ids[atoms.numbers == self.specie]
 
         poly_data = self._voro_data(supercell, central_points_ids)
@@ -307,9 +350,11 @@ class StructureFeaturizer:
         label = 'mobile_sublattice'
         atoms = self.atoms[self.atoms.numbers == self.specie].copy()
         supercell = self._create_supercell(atoms)
-        central_points_ids = np.arange(len(atoms) * supercell.info['translation_id'][(0,0,0)],
-                                      (len(atoms) * (supercell.info['translation_id'][(0,0,0)] + 1))) 
-        poly_data = self._voro_data(supercell, central_points_ids)
+        #central_points_ids = np.arange(len(atoms) * supercell.info['translation_id'][(0,0,0)],
+        #                              (len(atoms) * (supercell.info['translation_id'][(0,0,0)] + 1))) 
+        central_points_ids = np.arange(len(atoms))
+        central_points_ids = central_points_ids[atoms.numbers == self.specie]
+        #poly_data = self._voro_data(supercell, central_points_ids)
         site_features = {}
         for site in poly_data:
             site_poly_data = poly_data[site]
@@ -323,10 +368,7 @@ class StructureFeaturizer:
             for key in site_features.keys():
                 features.update({f'{label}_{stat}_{key}': self._calc_stat(np.array(site_features[key]), stat)})
 
-
-
         label = 'centroid'
-        
         atoms = self.atoms[self.atoms.numbers != self.specie].copy()
         supercell = self._create_supercell(atoms)
         central_points_ids = np.arange(len(supercell), len(supercell) + len(centroids))
@@ -353,8 +395,9 @@ class StructureFeaturizer:
             label = 'anions'
             atoms = self.atoms[self.atoms.arrays['oxi_states'] < 0].copy()
             supercell = self._create_supercell(atoms)
-            central_points_ids = np.arange(len(atoms) * supercell.info['translation_id'][(0,0,0)],
-                                        (len(atoms) * (supercell.info['translation_id'][(0,0,0)] + 1))) 
+            #central_points_ids = np.arange(len(atoms) * supercell.info['translation_id'][(0,0,0)],
+            #                            (len(atoms) * (supercell.info['translation_id'][(0,0,0)] + 1))) 
+            central_points_ids = np.arange(len(atoms))
             poly_data = self._voro_data(supercell, central_points_ids)
             site_features = {}
             for site in poly_data:
@@ -373,8 +416,9 @@ class StructureFeaturizer:
             label = 'cations'
             atoms = self.atoms[self.atoms.arrays['oxi_states'] > 0].copy()
             supercell = self._create_supercell(atoms)
-            central_points_ids = np.arange(len(atoms) * supercell.info['translation_id'][(0,0,0)],
-                                        (len(atoms) * (supercell.info['translation_id'][(0,0,0)] + 1))) 
+            # central_points_ids = np.arange(len(atoms) * supercell.info['translation_id'][(0,0,0)],
+            #                             (len(atoms) * (supercell.info['translation_id'][(0,0,0)] + 1))) 
+            central_points_ids = np.arange(len(atoms))
             poly_data = self._voro_data(supercell, central_points_ids)
             site_features = {}
             for site in poly_data:
