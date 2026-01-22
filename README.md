@@ -66,3 +66,20 @@ print(edges)
 
 - [Percolations barriers from nudged elastic band (NEB) calculations using universal machine learning interatomic potentials (UMLIPS)](notebooks/neb_umlip.ipynb)
 - [Available data](notebooks/available_data.ipynb)
+
+#### How to cite
+
+If you use the library consider citing the [following paper](https://www.nature.com/articles/s41524-025-01571-z#code-availability):
+
+```
+@article{dembitskiy2025benchmarking,
+  title={Benchmarking machine learning models for predicting lithium ion migration},
+  author={Dembitskiy, Artem D and Humonen, Innokentiy S and Eremin, Roman A and Aksyonov, Dmitry A and Fedotov, Stanislav S and Budennyy, Semen A},
+  journal={npj Computational Materials},
+  volume={11},
+  number={1},
+  pages={131},
+  year={2025},
+  publisher={Nature Publishing Group UK London}
+}
+```
