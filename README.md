@@ -33,8 +33,6 @@ pip install .
 
 > Note: The last library update was not systematically tested. Errors are expected. Be careful.
 
-##### Symmetrically inequivalent ionic hops (edges) forming percolating network
-
 
 #### Inequivalent ionic jumps (edges) forming a percolating network
 
