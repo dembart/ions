@@ -25,27 +25,33 @@ class PeriodicGraph:
         visited = {}
         translations = []
 
-        # BFS queue: (atom_index, lattice_offset)
-        queue = deque()
-        start = 0
-        queue.append((start, np.zeros(3, dtype=int)))
-        visited[start] = np.zeros(3, dtype=int)
+        all_nodes = np.unique(self.sources) # need to consider sym_labels in future
+        
+        for start in all_nodes:
+            if start in visited:
+                continue
 
-        while queue:
-            i, offset_i = queue.popleft()
-            # find neighbors of i
-            mask = self.sources == i
-            for j, off_ij in zip(self.targets[mask], self.offsets[mask]):
-                offset_j = offset_i + off_ij
+            # BFS queue: (atom_index, lattice_offset)
+            queue = deque()
+            start = int(np.min(self.sources))
+            queue.append((start, np.zeros(3, dtype=int)))
+            visited[start] = np.zeros(3, dtype=int)
 
-                if j not in visited:
-                    visited[j] = offset_j
-                    queue.append((j, offset_j))
-                else:
-                    # found a translational equivalence
-                    delta = offset_j - visited[j]
-                    if not np.all(delta == 0):
-                        translations.append(delta)
+            while queue:
+                i, offset_i = queue.popleft()
+                # find neighbors of i
+                mask = self.sources == i
+                for j, off_ij in zip(self.targets[mask], self.offsets[mask]):
+                    offset_j = offset_i + off_ij
+
+                    if j not in visited:
+                        visited[j] = offset_j
+                        queue.append((j, offset_j))
+                    else:
+                        # found a translational equivalence
+                        delta = offset_j - visited[j]
+                        if not np.all(delta == 0):
+                            translations.append(delta)
 
         independent = self._independent_vectors(translations)
         return len(independent), independent
